@@ -1,4 +1,4 @@
-\# 2048 AI
+# 2048 AI
 
 
 
@@ -10,13 +10,13 @@ We maken het spel 2048, maar dan speelt een AI het zelf. Voor elke zet kijkt de 
 
 
 
-\## Wie doet wat
+## Wie doet wat
 
 
 
-\- \*\*Lars Ysebaert\*\*: interface (het spel op het scherm tonen)
+- **Lars Ysebaert**: interface (het spel op het scherm tonen)
 
-\- \*\*Ocean Dekeyser\*\*: main (spelregels, bord en alles aan elkaar koppelen)
+- **Ocean Dekeyser**: main (spelregels, bord en alles aan elkaar koppelen)
 
-\- \*\*Brent Vileyn\*\*: algoritme (de AI die de beste zet kiest)
+- **Brent Vileyn**: algoritme (de AI die de beste zet kiest)
 
