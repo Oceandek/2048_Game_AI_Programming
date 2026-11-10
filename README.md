@@ -14,9 +14,8 @@ We maken het spel 2048, maar dan speelt een AI het zelf. Voor elke zet kijkt de 
 
 
 
-- **Lars Ysebaert**: interface (het spel op het scherm tonen)
-
-- **Ocean Dekeyser**: main (spelregels, bord en alles aan elkaar koppelen)
-
-- **Brent Vileyn**: algoritme (de AI die de beste zet kiest)
-
+<img src="https://github.com/LarsYse.png" width="24" align="center"> **[Lars Ysebaert](https://github.com/LarsYse)**: interface (het spel op het scherm tonen)
+  
+<img src="https://github.com/Oceandek.png" width="24" align="center"> **[Ocean Dekeyser](https://github.com/Oceandek)**: main (spelregels, bord en alles aan elkaar koppelen)
+  
+<img src="https://github.com/Brent69420809.png" width="24" align="center"> **[Brent Vileyn](https://github.com/Brent69420809)**: algoritme (de AI die de beste zet kiest)
