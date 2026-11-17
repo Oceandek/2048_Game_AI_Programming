@@ -37,6 +37,30 @@ def move_left(board):
     return [merge_row(row) for row in board]
 
 
+def reverse(board):
+    """Spiegelt elke rij: links wordt rechts."""
+    return [row[::-1] for row in board]
+
+
+def transpose(board):
+    """Rijen worden kolommen: boven wordt links."""
+    return [list(row) for row in zip(*board)]
+
+
+def move(board, direction):
+    """Schuift het bord in een richting: "left", "right", "up" of "down".
+    Truc: draai het bord zodat het een zet naar links wordt, en draai terug."""
+    if direction == "left":
+        return move_left(board)
+    if direction == "right":
+        return reverse(move_left(reverse(board)))
+    if direction == "up":
+        return transpose(move_left(transpose(board)))
+    if direction == "down":
+        return transpose(reverse(move_left(reverse(transpose(board)))))
+    raise ValueError("Onbekende richting: " + direction)
+
+
 def print_board(board):
     for row in board:
         print(" ".join(str(v).rjust(4) if v else "   ." for v in row))
@@ -47,5 +71,6 @@ if __name__ == "__main__":
     add_tile(board)
     add_tile(board)
     print_board(board)
-    print("\nNa links:")
-    print_board(move_left(board))
+    for direction in ["left", "right", "up", "down"]:
+        print("\nNa " + direction + ":")
+        print_board(move(board, direction))
