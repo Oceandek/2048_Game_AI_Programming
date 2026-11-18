@@ -1,39 +1,4 @@
-"""
-AI-spelers voor 2048 met drie moeilijkheidsgraden.
 
-  makkelijk   : "gulzig" (greedy) – kiest de zet die NU de meeste punten
-                oplevert, en maakt vaak bewust een willekeurige fout.
-  middelmatig : Expectimax met diepte 1 + heuristiek, af en toe een fout.
-  moeilijk    : Expectimax met adaptieve diepte (2-3) + sterke heuristiek,
-                geen fouten.
-
-Gebruik (met het bord uit game.py):
-
-    from ai import make_ai
-    ai, delay_ms = make_ai("Moeilijk")
-    richting = ai.choose_move(board)   # "left", "right", "up", "down" of None
-    board, points = move(board, richting)
-
-Expectimax
-----------
-2048 is geen spel tegen een tegenstander die jou wil laten verliezen, maar
-tegen het toeval: na elke zet verschijnt er op een willekeurige lege cel een
-2 (90%) of een 4 (10%). Daarom wisselt de zoekboom af tussen:
-  * MAX-knopen   : de AI kiest de beste zet (maximum),
-  * KANS-knopen  : het spel plaatst een tegel -> gewogen gemiddelde
-                   (verwachtingswaarde) over alle mogelijke plaatsingen.
-Aan de bladeren wordt het bord beoordeeld met een heuristiek.
-
-Heuristiek (per rij en per kolom, daarna opgeteld):
-  + lege cellen          (meer ruimte = minder kans om vast te lopen)
-  + mogelijke samenvoegingen
-  - niet-monotoon        (rijen moeten oplopen/aflopen -> "hoek-strategie")
-  - som van grote tegels (straft verspreide grote tegels af)
-
-Intern rekent de AI met een snellere voorstelling van het bord: een tuple van
-16 getallen met de "rang" van elke tegel (0 = leeg, 1 = 2, 2 = 4, 3 = 8, ...).
-Het bord uit game.py wordt daar één keer per zet naar omgezet.
-"""
 import random
 import time
 
@@ -44,7 +9,7 @@ class _Timeout(Exception):
     """Wordt opgegooid als een diepere zoektocht over het tijdsbudget gaat."""
 
 
-# ------------------------------------------------------- interne bordvorm
+#interne bordvorm
 def _to_ranks(board):
     """Bord uit game.py (4 lijsten met 0, 2, 4, 8, ...) -> tuple van 16 rangen."""
     return tuple(v.bit_length() - 1 if v else 0 for row in board for v in row)
@@ -92,7 +57,7 @@ def _move(b, direction):
     return nb, nb != b
 
 
-# ---------------------------------------------------------------- heuristiek
+# heuristiek
 LOST_PENALTY = 200000.0
 MONO_POWER = 4.0
 MONO_WEIGHT = 47.0
@@ -153,7 +118,7 @@ def evaluate(board):
     return _evaluate(_to_ranks(board))
 
 
-# ------------------------------------------------------------ AI-spelers
+# AI-spelers
 class AIPlayer:
     """Basisklasse: `mistake_rate` = kans dat de AI een willekeurige zet doet."""
 
@@ -282,7 +247,7 @@ class ExpectimaxAI(AIPlayer):
         return best
 
 
-# ------------------------------------------------------- moeilijkheidsgraden
+# moeilijkheidsgraden
 DIFFICULTIES = {
     # naam: (fabriek voor de AI, wachttijd tussen zetten in ms)
     "Makkelijk": (lambda: GreedyAI(mistake_rate=0.30), 700),
