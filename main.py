@@ -1,3 +1,13 @@
+"""main.py - start 2048 Arena.
+
+Starten:
+    python main.py              # start de website, er opent vanzelf een tabblad in je browser
+    python main.py terminal     # zelf spelen in de terminal met z/q/s/d
+"""
+
+import sys
+
+import app
 from game import new_board, add_tile, move, valid_moves, game_over, print_board
 
 KEYS = {"z": "up", "q": "left", "s": "down", "d": "right"}  # AZERTY
@@ -34,4 +44,7 @@ def play():
 
 
 if __name__ == "__main__":
-    play()
+    if len(sys.argv) > 1 and sys.argv[1] == "terminal":
+        play()
+    else:
+        app.main()
