@@ -10,12 +10,16 @@ Hoe het werkt
 * De interface staat in de map Web/ (index.html, style.css, app.js).
   De browser stuurt elke zet naar de server (bv. POST /api/move) en krijgt
   het nieuwe bord terug als JSON.
+* Tegen een vriend: de server draait op jouw computer. Je vriend opent op
+  hetzelfde wifi-netwerk het adres van jouw computer, bv.
+  http://192.168.0.24:8000/kamer/4F7K
 """
 
 import copy
 import json
 import random
 import secrets
+import socket
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -33,9 +37,14 @@ STATIC = {  # bestanden die de browser mag opvragen
 }
 DIFFICULTY = {"easy": "Makkelijk", "middel": "Middelmatig", "hard": "Moeilijk"}
 TARGETS = (1000, 2500, 5000)
+CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # geen 0/O en 1/I: niet te verwarren
+
+PORT = 8000
+LAN_IP = "127.0.0.1"
 
 lock = threading.Lock()  # de server beantwoordt verzoeken in meerdere threads
 games = {}  # spel-id -> spel (singleplayer of tegen de bot)
+rooms = {}  # kamercode -> kamer (tegen een vriend)
 
 
 class ApiError(Exception):
@@ -153,6 +162,24 @@ def _game_state(game):
             **game["match"].view(0)}
 
 
+def _room(data):
+    """Zoekt de kamer en welke speler (0 = host, 1 = gast) dit verzoek stuurt."""
+    room = rooms.get(str(data.get("code", "")).strip().upper())
+    if room is None:
+        raise ApiError("Kamer niet gevonden. Controleer de code.")
+    token = data.get("token")
+    if not token or token not in room["tokens"]:
+        raise ApiError("Je zit niet in deze kamer.")
+    return room, room["tokens"].index(token)
+
+
+def _room_state(room, idx):
+    return {"code": room["code"], "role": "host" if idx == 0 else "guest",
+            "connected": room["tokens"][1] is not None, "target": room["target"],
+            "round": room["round"],
+            "match": room["match"].view(idx) if room["match"] else None}
+
+
 # ======================================================= API: solo & bot
 def api_start(data):
     mode = data.get("mode")
@@ -166,7 +193,7 @@ def api_start(data):
         game = {"kind": "bot", "match": Match(_target(data)), "ai": ai,
                 "delay": delay, "diff": diff}
     else:
-        raise ApiError("Deze modus komt nog.")
+        raise ApiError("Onbekende modus.")
     game_id = secrets.token_hex(8)
     with lock:
         if len(games) > 200:  # oude spellen opruimen
@@ -213,11 +240,97 @@ def api_undo(data):
         return _game_state(game)
 
 
+# ===================================================== API: tegen vriend
+def api_room_create(data):
+    target = _target(data)
+    with lock:
+        while True:
+            code = "".join(random.choice(CODE_CHARS) for _ in range(4))
+            if code not in rooms:
+                break
+        token = secrets.token_hex(8)
+        rooms[code] = {"code": code, "tokens": [token, None], "target": target,
+                       "match": None, "round": 0}
+    return {"code": code, "token": token, "address": f"http://{LAN_IP}:{PORT}/kamer/{code}"}
+
+
+def api_room_join(data):
+    # ook een volledige link plakken mag: we nemen het laatste stuk
+    code = str(data.get("code", "")).strip().rstrip("/").split("/")[-1].upper()
+    with lock:
+        room = rooms.get(code)
+        if room is None:
+            raise ApiError("Kamer niet gevonden. Controleer de code.")
+        if room["tokens"][1] is not None:
+            raise ApiError("Deze kamer is al vol.")
+        token = secrets.token_hex(8)
+        room["tokens"][1] = token
+        return {"code": code, "token": token}
+
+
+def api_room_state(data):
+    with lock:
+        room, idx = _room(data)
+        return _room_state(room, idx)
+
+
+def api_room_target(data):
+    target = _target(data)
+    with lock:
+        room, idx = _room(data)
+        if idx != 0:
+            raise ApiError("Alleen de host kiest de doelscore.")
+        room["target"] = target
+        return _room_state(room, idx)
+
+
+def api_room_start(data):
+    with lock:
+        room, idx = _room(data)
+        if room["tokens"][1] is None:
+            raise ApiError("Wacht tot je vriend erbij is.")
+        room["round"] += 1
+        # om de beurt mag de host of de gast de eerste zet doen
+        room["match"] = Match(room["target"], first=(room["round"] + 1) % 2)
+        return _room_state(room, idx)
+
+
+def api_room_move(data):
+    direction = _direction(data)
+    with lock:
+        room, idx = _room(data)
+        if room["match"] is None:
+            raise ApiError("Het spel is nog niet gestart.")
+        room["match"].play(idx, direction)
+        return room["match"].view(idx)
+
+
+def api_room_leave(data):
+    with lock:
+        try:
+            room, idx = _room(data)
+        except ApiError:
+            return {}
+        if idx == 0:  # host weg = kamer dicht
+            rooms.pop(room["code"], None)
+        else:
+            room["tokens"][1] = None
+            room["match"] = None
+        return {}
+
+
 ACTIONS = {
     "/api/start": api_start,
     "/api/move": api_move,
     "/api/bot": api_bot,
     "/api/undo": api_undo,
+    "/api/room/create": api_room_create,
+    "/api/room/join": api_room_join,
+    "/api/room/state": api_room_state,
+    "/api/room/target": api_room_target,
+    "/api/room/start": api_room_start,
+    "/api/room/move": api_room_move,
+    "/api/room/leave": api_room_leave,
 }
 
 
@@ -239,7 +352,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
-        name = "index.html" if path == "/" else path.lstrip("/")
+        name = "index.html" if path == "/" or path.startswith("/kamer/") else path.lstrip("/")
         if name not in STATIC:
             self._send(404, b"Niet gevonden", "text/plain; charset=utf-8")
             return
@@ -267,19 +380,36 @@ class Server(ThreadingHTTPServer):
     daemon_threads = True
 
 
+def lan_ip():
+    """IP-adres van deze computer in het lokale netwerk (voor de kamerlink).
+    Een UDP-socket 'verbinden' verstuurt niets, maar kiest wel de juiste netwerkkaart."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("10.255.255.255", 1))
+        return s.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        s.close()
+
+
 def main():
+    global PORT, LAN_IP
+    LAN_IP = lan_ip()
     for port in range(8000, 8011):
         try:
-            server = Server(("127.0.0.1", port), Handler)
+            server = Server(("0.0.0.0", port), Handler)  # 0.0.0.0 = ook bereikbaar via wifi
             break
         except OSError:
             continue
     else:
         print("Geen vrije poort gevonden tussen 8000 en 8010.")
         return
+    PORT = port
     url = f"http://localhost:{port}"
     print("2048 Arena draait!")
-    print(f"  Open: {url}")
+    print(f"  Op deze computer : {url}")
+    print(f"  Voor je vriend   : http://{LAN_IP}:{port}  (zelfde wifi)")
     print("Stoppen: Ctrl+C")
     threading.Timer(0.5, webbrowser.open, args=[url]).start()
     try:
