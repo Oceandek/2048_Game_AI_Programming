@@ -9,12 +9,13 @@ def new_board():
     return [[0] * SIZE for _ in range(SIZE)]
 
 
-def add_tile(board):
-    """Zet een 2 (90%) of een 4 (10%) op een willekeurig leeg vak."""
+def add_tile(board, rng=random):
+    """Zet een 2 (90%) of een 4 (10%) op een willekeurig leeg vak.
+    `rng` is optioneel een eigen random.Random (bv. met een vaste seed)."""
     empty = [(r, c) for r in range(SIZE) for c in range(SIZE) if board[r][c] == 0]
     if empty:
-        r, c = random.choice(empty)
-        board[r][c] = 4 if random.random() < 0.1 else 2
+        r, c = rng.choice(empty)
+        board[r][c] = 4 if rng.random() < 0.1 else 2
 
 
 def merge_row(row):
